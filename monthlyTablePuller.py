@@ -78,7 +78,7 @@ day = datetime.date.today().day
 #Uncomment below if you want to extract past 7-days data before today
 #last_week_start = datetime.date.today() - relativedelta(weeks=1)
 #Uncomment below if you want to extract 7-days data from a specific day
-last_week_start = datetime.datetime(2025, 2, 4)
+last_week_start = datetime.datetime(2025, 2, 5)
 #Uncomment below if you want to extract monthly data for a specific month
 #start_month = datetime.datetime(2024, 5, 1)
 
