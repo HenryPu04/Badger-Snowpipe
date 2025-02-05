@@ -1,0 +1,11 @@
+
+*.csv
+report.txt
+credentials.txt
+*.pyc
+.idea/API_Lynn_Python.iml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+Logging/main.py.txt
