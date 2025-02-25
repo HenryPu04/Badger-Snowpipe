@@ -123,7 +123,7 @@ def load_data_into_table(file_name):
     )
     cursor = conn.cursor()
     try:
-        sanitized_file_name = file_name.replace(" ", "_")  # Optional: sanitize spaces
+        sanitized_file_name = file_name.replace(" ", "_")  #sanitize spaces
         copy_command = f"""
         COPY INTO BADGER.report_data
         FROM '@{SNOWFLAKE_STAGE}/{sanitized_file_name}'
@@ -228,7 +228,7 @@ def getReportDownloaded(statusUrl, username, password, filename="report.csv"):
         # Load data into the Snowflake table
         load_data_into_table(filename)
 
-        # Trigger Snowpipe if needed
+        # Trigger Snowpipe 
         trigger_snowpipe('my_pipe')
 
         # Log response headers
