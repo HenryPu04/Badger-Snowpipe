@@ -209,11 +209,12 @@ def getReportDownloaded(statusUrl, username, password, filename="report.csv"):
         filtered_data = []
 
         for row in reader:
-            # Check for empty data in all columns except for the specified ones
+            # Apply default values first
+            if not row["Current_Leak_Rate"].strip():
+                row["Current_Leak_Rate"] = "0.0"  # Set default value for empty "Current_Leak_Rate"
+
+            # Filter rows based on the updated data
             if all(row[col].strip() for col in row if col not in ["Register_Number", "Current_Leak_Start_Date", "Current_Leak_Rate"]):
-                # Set default value for "Current_Leak_Rate" if empty
-                if not row["Current_Leak_Rate"].strip():
-                    row["Current_Leak_Rate"] = "0.0"
                 filtered_data.append(row)
 
         # Write the filtered data to the output file
