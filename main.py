@@ -123,18 +123,77 @@ def load_data_into_table(file_name):
     )
     cursor = conn.cursor()
     try:
-        sanitized_file_name = file_name.replace(" ", "_")  #sanitize spaces
-        copy_command = f"""
-        COPY INTO BADGER.report_data
-        FROM '@{SNOWFLAKE_STAGE}/{sanitized_file_name}'
-        FILE_FORMAT = (TYPE = 'CSV' FIELD_OPTIONALLY_ENCLOSED_BY = '"' SKIP_HEADER = 1)
-        ON_ERROR = 'CONTINUE';
+        sanitized_file_name = file_name.replace(" ", "_")  # Sanitize spaces
+
+        # Use a MERGE statement to avoid duplicates
+        merge_command = f"""
+        MERGE INTO BADGER.report_data AS target
+        USING (
+            SELECT *
+            FROM (
+                SELECT
+                    $1 AS Account_ID,
+                    $2 AS Register_Number,
+                    $3 AS Meter_ID,
+                    $4 AS Location_Name,
+                    $5 AS Endpoint_SN,
+                    $6 AS Flow,
+                    $7 AS Flow_Unit,
+                    $8 AS Flow_Time,
+                    $9 AS Encoder_Read,
+                    $10 AS Meter_SN,
+                    $11 AS Register_Resolution,
+                    $12 AS Endpoint_Status,
+                    $13 AS Battery_Level,
+                    $14 AS Signal_Strength,
+                    $15 AS Current_Leak_Start_Date,
+                    $16 AS Current_Leak_Rate,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY $1, $4, $8  -- Match ON columns: Account_ID, Location_Name, Flow_Time
+                        ORDER BY $8 DESC         -- Prefer latest Flow_Time if duplicates exist
+                    ) AS rn
+                FROM @{SNOWFLAKE_STAGE}/{sanitized_file_name}
+            )
+            WHERE rn = 1  -- Keep only one row per match group
+        ) AS source
+        ON target.Account_ID = source.Account_ID
+        AND target.Location_Name = source.Location_Name
+        AND target.Flow_Time = source.Flow_Time
+        WHEN MATCHED THEN
+            UPDATE SET 
+                target.Register_Number = source.Register_Number,
+                target.Meter_ID = source.Meter_ID,
+                target.Endpoint_SN = source.Endpoint_SN,
+                target.Flow = source.Flow,
+                target.Flow_Unit = source.Flow_Unit,
+                target.Encoder_Read = source.Encoder_Read,
+                target.Meter_SN = source.Meter_SN,
+                target.Register_Resolution = source.Register_Resolution,
+                target.Endpoint_Status = source.Endpoint_Status,
+                target.Battery_Level = source.Battery_Level,
+                target.Signal_Strength = source.Signal_Strength,
+                target.Current_Leak_Start_Date = source.Current_Leak_Start_Date,
+                target.Current_Leak_Rate = source.Current_Leak_Rate
+        WHEN NOT MATCHED THEN
+            INSERT (
+                Account_ID, Register_Number, Meter_ID, Location_Name, Endpoint_SN, Flow, Flow_Unit, Flow_Time,
+                Encoder_Read, Meter_SN, Register_Resolution, Endpoint_Status, Battery_Level, Signal_Strength,
+                Current_Leak_Start_Date, Current_Leak_Rate
+            )
+            VALUES (
+                source.Account_ID, source.Register_Number, source.Meter_ID, source.Location_Name, source.Endpoint_SN, source.Flow,
+                source.Flow_Unit, source.Flow_Time, source.Encoder_Read, source.Meter_SN, source.Register_Resolution,
+                source.Endpoint_Status, source.Battery_Level, source.Signal_Strength, source.Current_Leak_Start_Date,
+                source.Current_Leak_Rate
+            );
         """
-        cursor.execute(copy_command)
-        print(f"Data loaded successfully into BADGER.report_data from {sanitized_file_name}")
+        cursor.execute(merge_command)
+
+        print(f"Data merged successfully into BADGER.report_data from {sanitized_file_name}")
     finally:
         cursor.close()
         conn.close()
+
 
 def trigger_snowpipe(pipe_name):
     conn = snowflake.connector.connect(
@@ -277,8 +336,18 @@ def getCredentials():
 def main():
     username, password = getCredentials()
     logger.log("BeaverWorks Report Downloader", "Title")
-    statusUrl = getStatusUrl(username, password)
+    
+    # Define the date range
+    startDate = "2024-01-01"  
+    endDate = datetime.today().strftime('%Y-%m-%d')  # End date: today's date
+    
+    # Pass the date range to getStatusUrl
+    statusUrl = getStatusUrl(username, password, startDate=startDate, endDate=endDate)
+    
+    # Download and process the report
     getReportDownloaded(statusUrl, username, password)
+    
     logger.log("Completed")
     logger.close()
+
 main()
